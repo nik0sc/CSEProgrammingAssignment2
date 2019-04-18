@@ -1,10 +1,16 @@
+import javax.crypto.Cipher;
 import java.io.*;
 import java.net.Socket;
+import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.PublicKey;
+import java.security.SecureRandom;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.util.Arrays;
 
 public class ClientWithoutSecurity {
 	public static final String CA_CERT_FILENAME = "";
@@ -35,6 +41,102 @@ public class ClientWithoutSecurity {
 		return serverCert.getPublicKey();
 	}
 
+	public static final String PROTOCOL_HI_STR = "HELLO V1 NONCE=";
+	public static final byte[] PROTOCOL_HI = PROTOCOL_HI_STR.getBytes(StandardCharsets.US_ASCII);
+
+	public static final String PROTOCOL_CERT_REQUEST_STR = "CERT?\n";
+	public static final byte[] PROTOCOL_CERT_REQUEST = PROTOCOL_CERT_REQUEST_STR.getBytes(StandardCharsets.US_ASCII);
+
+	public static final int PROTOCOL_NONCE_LENGTH = 64;
+	public static final int PROTOCOL_NONCE_M_LENGTH = 1024;
+	public static final String PROTOCOL_NONCE_CIPHER = "RSA/ECB/PKCS1Padding";
+
+	/**
+	 * Read blob from server. The blob is prefixed with an unsigned short (16 bits) indicating the length of the
+	 * data to follow. Beware of buffer under/overflow
+	 *
+	 * @param fromServer
+	 * @return byte array containing the blob
+	 * @throws IOException
+	 */
+	public static byte[] readBlobFromServer(DataInputStream fromServer) throws IOException {
+		// First read 16 bits worth of unsigned data - that is the length
+		// Then allocate a buffer from it
+		int blobLength = fromServer.readUnsignedShort();
+		ByteBuffer buffer = ByteBuffer.allocate(blobLength);
+		assert blobLength > 0;
+
+		// Now read all the data that will fit
+		for (int i = 0; i < blobLength; i++) {
+			buffer.put(fromServer.readByte());
+		}
+
+		return buffer.array();
+	}
+
+	/**
+	 * Perform the authentication handshake (get cert, verify with CA, challenge with nonce)
+	 *
+	 * @param toServer
+	 * @param fromServer
+	 * @param secureRandom
+	 * @return
+	 * @throws IOException
+	 * @throws GeneralSecurityException
+	 */
+	public static PublicKey doAuthenticationHandshake(DataOutputStream toServer, DataInputStream fromServer,
+													  SecureRandom secureRandom)
+			throws IOException, GeneralSecurityException {
+		// Generate nonce
+		byte[] nonce = new byte[PROTOCOL_NONCE_LENGTH];
+		secureRandom.nextBytes(nonce);
+
+        // Say hi to the remote server, send a nonce
+		// Length of PROTOCOL_HI string + nonce + newline
+		ByteBuffer outputHiBuffer = ByteBuffer.allocate(PROTOCOL_HI.length + PROTOCOL_NONCE_LENGTH + 1);
+		outputHiBuffer.put(PROTOCOL_HI);
+		outputHiBuffer.put(nonce);
+		outputHiBuffer.put((byte)'\n');
+
+		toServer.write(outputHiBuffer.array());
+		toServer.flush();
+
+		// Read the encrypted nonce and remember it
+		byte[] encryptedNonce = readBlobFromServer(fromServer);
+
+        // Ask for the cert
+		toServer.write(PROTOCOL_CERT_REQUEST);
+		toServer.flush();
+
+        // Read and remember the cert
+		byte[] serverCertBytes = readBlobFromServer(fromServer);
+
+		// Load and verify the server cert
+		CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
+		X509Certificate serverCert = (X509Certificate) certificateFactory.generateCertificate(
+				new ByteArrayInputStream(serverCertBytes));
+
+		// Grab the publickey
+		PublicKey serverPubKey = getAndVerifyPubKey(serverCert);
+
+		// And verify the nonce
+		Cipher rsaCipherDec = Cipher.getInstance(PROTOCOL_NONCE_CIPHER);
+		rsaCipherDec.init(Cipher.DECRYPT_MODE, serverPubKey);
+		byte[] nonceDec = rsaCipherDec.doFinal(encryptedNonce);
+
+		if (Arrays.equals(nonce, nonceDec)) {
+			return serverPubKey;
+		} else {
+			// Die a horrible death
+			throw new GeneralSecurityException("OMG");
+		}
+    }
+
+
+    public static void doHandshake() {
+
+	}
+
 	public static void main(String[] args) {
 
     	String filename = "rr.txt";
@@ -58,6 +160,9 @@ public class ClientWithoutSecurity {
 
 		long timeStarted = System.nanoTime();
 
+		SecureRandom secureRandom = new SecureRandom();
+		PublicKey serverPubKey;
+
 		try {
 
 			System.out.println("Establishing connection to server...");
@@ -66,6 +171,9 @@ public class ClientWithoutSecurity {
 			clientSocket = new Socket(serverAddress, port);
 			toServer = new DataOutputStream(clientSocket.getOutputStream());
 			fromServer = new DataInputStream(clientSocket.getInputStream());
+
+			// Do the authentication!
+			serverPubKey = doAuthenticationHandshake(toServer, fromServer, secureRandom);
 
 			System.out.println("Sending file...");
 
@@ -97,6 +205,8 @@ public class ClientWithoutSecurity {
 
 			System.out.println("Closing connection...");
 
+		} catch (GeneralSecurityException e) {
+			System.out.println("Security exception!!");
 		} catch (Exception e) {e.printStackTrace();}
 
 		long timeTaken = System.nanoTime() - timeStarted;
