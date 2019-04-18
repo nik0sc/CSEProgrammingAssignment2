@@ -1,10 +1,39 @@
-import java.io.BufferedInputStream;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.FileInputStream;
+import java.io.*;
 import java.net.Socket;
+import java.security.GeneralSecurityException;
+import java.security.PublicKey;
+import java.security.cert.CertificateException;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 
 public class ClientWithoutSecurity {
+	public static final String CA_CERT_FILENAME = "";
+
+	/**
+	 * Verify server certificate and return its public key
+	 *
+	 * @param serverCert
+	 * @return
+	 * @throws FileNotFoundException
+	 * @throws GeneralSecurityException
+	 */
+	public static PublicKey getAndVerifyPubKey(X509Certificate serverCert)
+			throws FileNotFoundException, GeneralSecurityException {
+		// Load CA pubkey
+		InputStream caCertInputStream = new FileInputStream(CA_CERT_FILENAME);
+		CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
+		X509Certificate caCert = (X509Certificate) certificateFactory.generateCertificate(caCertInputStream);
+		PublicKey caPubKey = caCert.getPublicKey();
+
+		// throws exceptions CertificateExpiredException, CertificateNotYetValidException
+		caCert.checkValidity();
+		serverCert.checkValidity();
+
+		// Extract signature from cert
+		serverCert.verify(caPubKey);
+
+		return serverCert.getPublicKey();
+	}
 
 	public static void main(String[] args) {
 
