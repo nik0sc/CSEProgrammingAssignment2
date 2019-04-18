@@ -2,12 +2,9 @@ import javax.crypto.Cipher;
 import java.io.*;
 import java.net.Socket;
 import java.nio.ByteBuffer;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.PublicKey;
 import java.security.SecureRandom;
-import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.Arrays;
@@ -41,16 +38,6 @@ public class ClientWithoutSecurity {
 		return serverCert.getPublicKey();
 	}
 
-	public static final String PROTOCOL_HI_STR = "HELLO V1 NONCE=";
-	public static final byte[] PROTOCOL_HI = PROTOCOL_HI_STR.getBytes(StandardCharsets.US_ASCII);
-
-	public static final String PROTOCOL_CERT_REQUEST_STR = "CERT?\n";
-	public static final byte[] PROTOCOL_CERT_REQUEST = PROTOCOL_CERT_REQUEST_STR.getBytes(StandardCharsets.US_ASCII);
-
-	public static final int PROTOCOL_NONCE_LENGTH = 64;
-	public static final int PROTOCOL_NONCE_M_LENGTH = 1024;
-	public static final String PROTOCOL_NONCE_CIPHER = "RSA/ECB/PKCS1Padding";
-
 	/**
 	 * Read blob from server. The blob is prefixed with an unsigned short (16 bits) indicating the length of the
 	 * data to follow. Beware of buffer under/overflow
@@ -63,8 +50,8 @@ public class ClientWithoutSecurity {
 		// First read 16 bits worth of unsigned data - that is the length
 		// Then allocate a buffer from it
 		int blobLength = fromServer.readUnsignedShort();
-		ByteBuffer buffer = ByteBuffer.allocate(blobLength);
 		assert blobLength > 0;
+		ByteBuffer buffer = ByteBuffer.allocate(blobLength);
 
 		// Now read all the data that will fit
 		for (int i = 0; i < blobLength; i++) {
@@ -88,13 +75,13 @@ public class ClientWithoutSecurity {
 													  SecureRandom secureRandom)
 			throws IOException, GeneralSecurityException {
 		// Generate nonce
-		byte[] nonce = new byte[PROTOCOL_NONCE_LENGTH];
+		byte[] nonce = new byte[Protocol.NONCE_LENGTH];
 		secureRandom.nextBytes(nonce);
 
         // Say hi to the remote server, send a nonce
-		// Length of PROTOCOL_HI string + nonce + newline
-		ByteBuffer outputHiBuffer = ByteBuffer.allocate(PROTOCOL_HI.length + PROTOCOL_NONCE_LENGTH + 1);
-		outputHiBuffer.put(PROTOCOL_HI);
+		// Length of CLIENT_HI string + nonce + newline
+		ByteBuffer outputHiBuffer = ByteBuffer.allocate(Protocol.CLIENT_HI.length + Protocol.NONCE_LENGTH + 1);
+		outputHiBuffer.put(Protocol.CLIENT_HI);
 		outputHiBuffer.put(nonce);
 		outputHiBuffer.put((byte)'\n');
 
@@ -105,7 +92,7 @@ public class ClientWithoutSecurity {
 		byte[] encryptedNonce = readBlobFromServer(fromServer);
 
         // Ask for the cert
-		toServer.write(PROTOCOL_CERT_REQUEST);
+		toServer.write(Protocol.CLIENT_CERT_REQUEST);
 		toServer.flush();
 
         // Read and remember the cert
@@ -120,11 +107,15 @@ public class ClientWithoutSecurity {
 		PublicKey serverPubKey = getAndVerifyPubKey(serverCert);
 
 		// And verify the nonce
-		Cipher rsaCipherDec = Cipher.getInstance(PROTOCOL_NONCE_CIPHER);
+		Cipher rsaCipherDec = Cipher.getInstance(Protocol.NONCE_CIPHER);
 		rsaCipherDec.init(Cipher.DECRYPT_MODE, serverPubKey);
 		byte[] nonceDec = rsaCipherDec.doFinal(encryptedNonce);
 
 		if (Arrays.equals(nonce, nonceDec)) {
+			// tell the server all is well
+			toServer.write(Protocol.CLIENT_AUTH_OK);
+			toServer.flush();
+
 			return serverPubKey;
 		} else {
 			// Die a horrible death
