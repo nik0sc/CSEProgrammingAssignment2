@@ -174,7 +174,7 @@ public class ClientWithSecurity {
                 }
 
                 Protocol.writeEncryptedBlob(toServer, fromFileBuffer, 0, numBytes, rsaCipherEnc);
-                md.update(fromFileBuffer);
+                md.update(fromFileBuffer, 0, numBytes);
             }
 
 	        // Send digest
