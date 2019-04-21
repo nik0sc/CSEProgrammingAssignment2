@@ -1,13 +1,11 @@
-import jdk.jshell.spi.ExecutionControl;
-
 import javax.crypto.Cipher;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
-import java.security.Key;
 
 public class Protocol {
     public static final String CLIENT_HI_STR = "HELLO V1 NONCE=";
@@ -36,7 +34,7 @@ public class Protocol {
      * @throws IOException
      */
     public static byte[] readBlob(DataInputStream fromServer) throws IOException {
-        // First read 16 bits worth of unsigned data - that is the length
+        // First read 32 bits worth of unsigned data - that is the length
         // Then allocate a buffer from it
         int blobLength = fromServer.readInt();
         assert blobLength > 0;
@@ -63,8 +61,10 @@ public class Protocol {
             int length,
             Cipher cipher
     ) throws IOException, GeneralSecurityException {
-        to.write(cipher.doFinal(byteArray, offset, length));
-        to.flush();
+        // byte[] len 2, offset 1, length 1 is valid
+        assert (offset + length) <= byteArray.length;
+
+        writeBlob(to, cipher.doFinal(byteArray, offset, length));
     }
 
     public static void writeEncryptedBlob(DataOutputStream to, byte[] byteArray, Cipher cipher)
