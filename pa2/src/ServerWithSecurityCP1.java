@@ -14,7 +14,7 @@ public class ServerWithSecurityCP1 {
 	private static final String PRIVATE_KEY_FILE_NAME = "private_key.der";
 	private static PrivateKey privateKey = null;
 
-	private static final String CERT_FILE_NAME = "example.org.crt";
+	private static final String CERT_FILE_NAME = "server_cert.crt";
 
 	private static PrivateKey getPrivateKey() {
 		if (privateKey == null) {

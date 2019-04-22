@@ -13,7 +13,8 @@ import java.util.Arrays;
 public class ClientWithSecurityCP1 {
 	public static final String CA_CERT_FILENAME = "cacse.crt";
 
-	private static final int READ_FILE_BLOCK_SIZE = 245;
+	// This is really just dependent on the private key size. This works for 1024 bit keys
+	private static final int READ_FILE_BLOCK_SIZE = 117;
 
 	/**
 	 * Verify server certificate and return its public key
