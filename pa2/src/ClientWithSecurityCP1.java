@@ -10,7 +10,7 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.Arrays;
 
-public class ClientWithSecurity {
+public class ClientWithSecurityCP1 {
 	public static final String CA_CERT_FILENAME = "cacse.crt";
 
 	private static final int READ_FILE_BLOCK_SIZE = 245;
@@ -59,9 +59,9 @@ public class ClientWithSecurity {
 		secureRandom.nextBytes(nonce);
 
         // Say hi to the remote server, send a nonce
-		// Length of CLIENT_HI string + nonce + newline
-		ByteBuffer outputHiBuffer = ByteBuffer.allocate(Protocol.CLIENT_HI.length + Protocol.NONCE_LENGTH + 1);
-		outputHiBuffer.put(Protocol.CLIENT_HI);
+		// Length of CLIENT_HI_CP1 string + nonce + newline
+		ByteBuffer outputHiBuffer = ByteBuffer.allocate(Protocol.CLIENT_HI_CP1.length + Protocol.NONCE_LENGTH + 1);
+		outputHiBuffer.put(Protocol.CLIENT_HI_CP1);
 		outputHiBuffer.put(nonce);
 		outputHiBuffer.put((byte)'\n');
 
@@ -87,13 +87,13 @@ public class ClientWithSecurity {
 		PublicKey serverPubKey = getAndVerifyPubKey(serverCert);
 
 		// And verify the nonce
-		Cipher rsaCipherDec = Cipher.getInstance(Protocol.CIPHER_SPEC);
+		Cipher rsaCipherDec = Cipher.getInstance(Protocol.CIPHER_1_SPEC);
 		rsaCipherDec.init(Cipher.DECRYPT_MODE, serverPubKey);
 		byte[] nonceDec = rsaCipherDec.doFinal(encryptedNonce);
 
 		if (Arrays.equals(nonce, nonceDec)) {
 			// tell the server all is well
-			toServer.write(Protocol.CLIENT_AUTH_OK);
+			toServer.write(Protocol.OK);
 			toServer.flush();
 
 			return serverPubKey;
@@ -122,29 +122,41 @@ public class ClientWithSecurity {
 								Cipher cipherEnc, String filename)
 			throws GeneralSecurityException, IOException {
 		// make file digest
-		MessageDigest md = MessageDigest.getInstance("SHA-256");
+		MessageDigest md = MessageDigest.getInstance(Protocol.DIGEST_SPEC);
 		long fileLength = new File(filename).length();
+		assert fileLength <= Integer.MAX_VALUE;
 		int numBlocks = (int) Math.ceil((double)fileLength/READ_FILE_BLOCK_SIZE);
 
-		// Send the encrypted filename and number of blocks
+		// Send the encrypted filename, file size, and number of blocks
 		byte[] filenameBytes = filename.getBytes();
 
-		ByteBuffer filenameMessageBuf = ByteBuffer.allocate(
-				Protocol.CLIENT_FILE_NAME.length + filenameBytes.length);
-		filenameMessageBuf.put(Protocol.CLIENT_FILE_NAME);
-		filenameMessageBuf.put(filenameBytes);
-		Protocol.writeEncryptedBlob(toServer, filenameMessageBuf.array(), cipherEnc);
+        int metadataBlockLength = Protocol.CLIENT_METADATA_BLOCK.length
+                + 8 // file size + num blocks
+                + filenameBytes.length
+                + 1; // \0
+
+		// Must fit into one block
+		assert metadataBlockLength <= READ_FILE_BLOCK_SIZE;
+
+		ByteBuffer metadataBuf = ByteBuffer.allocate(metadataBlockLength);
+		metadataBuf.put(Protocol.CLIENT_METADATA_BLOCK);
+		metadataBuf.putInt((int)fileLength);
+		metadataBuf.putInt(numBlocks);
+        metadataBuf.put(filenameBytes);
+        metadataBuf.put((byte)'\0');
+
+        System.out.println("Metadata: " + Arrays.toString(metadataBuf.array()));
+
+		Protocol.writeEncryptedBlob(toServer, metadataBuf.array(), cipherEnc);
+
+		Protocol.readOK(fromServer);
 
 		// Open the file
 		FileInputStream fileInputStream = new FileInputStream(filename);
 		BufferedInputStream bufferedFileInputStream = new BufferedInputStream(fileInputStream);
 
-		// File size?
-
 		System.out.println(String.format("Sending %d blocks of %d ciphertext bytes each",
 				numBlocks, cipherEnc.getBlockSize()));
-
-
 
 		byte[] fromFileBuffer = new byte[READ_FILE_BLOCK_SIZE];
 		int i = 0;
@@ -163,6 +175,8 @@ public class ClientWithSecurity {
 
 		System.out.println(String.format("Sent %d blocks", i));
 
+		assert i == numBlocks;
+
 		// Send digest
 		byte[] digest = md.digest();
 		ByteBuffer digestMessageBuf = ByteBuffer.allocate(
@@ -171,6 +185,7 @@ public class ClientWithSecurity {
 		digestMessageBuf.put(digest);
 
 		Protocol.writeEncryptedBlob(toServer, digestMessageBuf.array(), cipherEnc);
+		Protocol.readOK(fromServer);
 
 		bufferedFileInputStream.close();
 		fileInputStream.close();
@@ -214,13 +229,14 @@ public class ClientWithSecurity {
 			System.out.println("Sending file...");
 
 			// set up cipher
-            Cipher rsaCipherEnc = Cipher.getInstance(Protocol.CIPHER_SPEC);
+            Cipher rsaCipherEnc = Cipher.getInstance(Protocol.CIPHER_1_SPEC);
             rsaCipherEnc.init(Cipher.ENCRYPT_MODE, serverPubKey);
 
             sendFile(toServer, fromServer, rsaCipherEnc, filename);
 
 			System.out.println("Closing connection...");
-			toServer.write(rsaCipherEnc.doFinal(Protocol.CLIENT_BYE));
+			toServer.write(Protocol.CLIENT_BYE);
+			toServer.flush();
 			toServer.close();
 			fromServer.close();
 
