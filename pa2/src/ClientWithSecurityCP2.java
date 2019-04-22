@@ -1,15 +1,15 @@
 import javax.crypto.Cipher;
-import java.io.*;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.net.Socket;
 import java.security.GeneralSecurityException;
 import java.security.PublicKey;
 import java.security.SecureRandom;
 
-public class ClientWithSecurityCP1 {
+public class ClientWithSecurityCP2 {
 	public static final String CA_CERT_FILENAME = "cacse.crt";
 
-	// This is really just dependent on the private key size. This works for 1024 bit keys
-	private static final int READ_FILE_BLOCK_SIZE = 117;
+	private static final int READ_FILE_BLOCK_SIZE = 100;
 
 
 	public static void main(String[] args) {
@@ -45,15 +45,16 @@ public class ClientWithSecurityCP1 {
 			fromServer = new DataInputStream(clientSocket.getInputStream());
 
 			// Do the authentication!
-			serverPubKey = ClientCommon.doAuthenticationHandshake(toServer, fromServer, secureRandom, Protocol.CLIENT_HI_CP1);
+			serverPubKey = ClientCommon.doAuthenticationHandshake(toServer, fromServer, secureRandom, Protocol.CLIENT_HI_CP2);
+			// set up cipher
+			Cipher rsaCipherEnc = Cipher.getInstance(Protocol.CIPHER_1_SPEC);
+			rsaCipherEnc.init(Cipher.ENCRYPT_MODE, serverPubKey);
+
+			Protocol.SessionCipher sessionCipher = ClientCommon.doKeyExchange(toServer, fromServer, secureRandom, rsaCipherEnc);
 
 			System.out.println("Sending file...");
 
-			// set up cipher
-            Cipher rsaCipherEnc = Cipher.getInstance(Protocol.CIPHER_1_SPEC);
-            rsaCipherEnc.init(Cipher.ENCRYPT_MODE, serverPubKey);
-
-            ClientCommon.sendFile(toServer, fromServer, rsaCipherEnc, filename, READ_FILE_BLOCK_SIZE);
+            ClientCommon.sendFile(toServer, fromServer, sessionCipher.getEnc(), filename, READ_FILE_BLOCK_SIZE);
 
 			System.out.println("Closing connection...");
 			toServer.write(Protocol.CLIENT_BYE);

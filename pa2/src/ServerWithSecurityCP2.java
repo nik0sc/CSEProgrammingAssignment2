@@ -2,11 +2,16 @@ import javax.crypto.Cipher;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.security.*;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
+import java.security.MessageDigest;
+import java.security.PrivateKey;
+import java.util.Arrays;
 
-public class ServerWithSecurityCP1 {
+public class ServerWithSecurityCP2 {
 
-    public static void main(String[] args) {
+	public static void main(String[] args) {
 
     	int port = 4321;
     	if (args.length > 0) port = Integer.parseInt(args[0]);
@@ -28,9 +33,11 @@ public class ServerWithSecurityCP1 {
 			Cipher rsaCipherDec = Cipher.getInstance(Protocol.CIPHER_1_SPEC);
 			rsaCipherDec.init(Cipher.DECRYPT_MODE, privateKey);
 
-			ServerCommon.doAuthenticationHandshake(toClient, fromClient, rsaCipherEnc, Protocol.CLIENT_HI_CP1);
+			ServerCommon.doAuthenticationHandshake(toClient, fromClient, rsaCipherEnc, Protocol.CLIENT_HI_CP2);
 
-			ServerCommon.receiveFile(toClient, fromClient, rsaCipherDec);
+			Protocol.SessionCipher sessionCipher = ServerCommon.doKeyExchange(toClient, fromClient, rsaCipherDec);
+
+			ServerCommon.receiveFile(toClient, fromClient, sessionCipher.getDec());
 
 			toClient.close();
 			fromClient.close();

@@ -11,11 +11,14 @@ public class Protocol {
 
     public static final String CLIENT_HI_CP1_STR = "HELLO CP1 V1 NONCE=";
     public static final byte[] CLIENT_HI_CP1 = CLIENT_HI_CP1_STR.getBytes(StandardCharsets.US_ASCII);
+    public static final String CLIENT_HI_CP2_STR = "HELLO CP2 V1 NONCE=";
+    public static final byte[] CLIENT_HI_CP2 = CLIENT_HI_CP2_STR.getBytes(StandardCharsets.US_ASCII);
+
     public static final String CLIENT_CERT_REQUEST_STR = "CERT?\n";
     public static final byte[] CLIENT_CERT_REQUEST = CLIENT_CERT_REQUEST_STR.getBytes(StandardCharsets.US_ASCII);
     public static final int NONCE_LENGTH = 64;
     public static final String CIPHER_1_SPEC = "RSA/ECB/PKCS1Padding";
-    public static final String CIPHER_2_SPEC = "RSA/ECB/PKCS1Padding";
+    public static final String CIPHER_2_SPEC = "AES/ECB/PKCS5Padding";
     public static final String DIGEST_SPEC = "SHA-256";
 
     public static final String OK_STR = "OK!\n";
@@ -92,6 +95,24 @@ public class Protocol {
 
     public static void readOK(DataInputStream from) throws IOException {
         readForBytes(from, OK);
+    }
+
+    public static class SessionCipher {
+        private Cipher enc;
+        private Cipher dec;
+
+        public SessionCipher(Cipher enc, Cipher dec) {
+            this.enc = enc;
+            this.dec = dec;
+        }
+
+        public Cipher getEnc() {
+            return enc;
+        }
+
+        public Cipher getDec() {
+            return dec;
+        }
     }
 
 //    public static byte[] doCipherFInal(Cipher cipher, )
