@@ -2,9 +2,6 @@ import javax.crypto.Cipher;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.nio.ByteBuffer;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
@@ -29,6 +26,7 @@ public class ServerWithoutSecurity {
 				FileInputStream fileInputStream = new FileInputStream(PRIVATE_KEY_FILE_NAME);
 				privateKey = fileInputStream.readAllBytes();
 			} catch (IOException e) {
+				e.printStackTrace();
 				assert false;
 			}
 
@@ -68,12 +66,12 @@ public class ServerWithoutSecurity {
 
 		//  encrypt nonce
 		PrivateKey privateKey = getPrivateKey();
-		Cipher rsaCipherEnc = Cipher.getInstance(Protocol.NONCE_CIPHER);
+		Cipher rsaCipherEnc = Cipher.getInstance(Protocol.CIPHER_SPEC);
 		rsaCipherEnc.init(Cipher.ENCRYPT_MODE, privateKey);
 		byte[] encryptedNonce = rsaCipherEnc.doFinal(nonce);
 
 		// send encrypted nonce, prepended with length
-		toClient.writeShort(encryptedNonce.length);
+		toClient.writeInt(encryptedNonce.length);
 		toClient.write(encryptedNonce);
 		toClient.flush();
 
@@ -85,7 +83,7 @@ public class ServerWithoutSecurity {
 		// send cert, prepeded with size
 		FileInputStream certStream = new FileInputStream(CERT_FILE_NAME);
 		byte[] certByteArray = certStream.readAllBytes();
-		toClient.writeShort(certByteArray.length);
+		toClient.writeInt(certByteArray.length);
 		toClient.write(certByteArray);
 		toClient.flush();
 
