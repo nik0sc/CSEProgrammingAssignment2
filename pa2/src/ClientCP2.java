@@ -129,12 +129,8 @@ public class ClientCP2 {
         // only need to flush after all writes are done
         toServer.flush();
 
-        // send up to 8 blocks worth of digest
-        byte[] checksum = md.digest();
-        if (cipherEnc.getOutputSize(checksum.length) > 8 * blockSize) {
-            throw new IllegalArgumentException("checksum longer than 8 cipher blocks");
-        }
-        toServer.write(cipherEnc.doFinal(checksum));
+        // send the digest
+        toServer.write(cipherEnc.doFinal(md.digest()));
         toServer.flush();
 
         bufferedFileInputStream.close();

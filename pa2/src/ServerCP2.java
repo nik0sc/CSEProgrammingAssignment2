@@ -59,7 +59,7 @@ public class ServerCP2 {
         bufferedFileOutputStream.close();
         fileOutputStream.close();
         // make sure digests match, if not then delete file
-        byte[] clientDigest = cipher.doFinal(fromClient.readNBytes(8 * blockSize));
+        byte[] clientDigest = cipher.doFinal(fromClient.readAllBytes());
         byte[] serverDigest = md.digest();
         if (!Arrays.equals(clientDigest, serverDigest)) {
             System.out.println("File checksums do not match, deleting...");
