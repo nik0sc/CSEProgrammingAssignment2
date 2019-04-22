@@ -3,85 +3,58 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 
 public class Protocol {
-    private static final boolean DEBUG = true;
-
-    public static final String CLIENT_HI_STR = "HELLO V1 NONCE=";
-    public static final byte[] CLIENT_HI = CLIENT_HI_STR.getBytes(StandardCharsets.US_ASCII);
-    public static final String CLIENT_CERT_REQUEST_STR = "CERT?\n";
-    public static final byte[] CLIENT_CERT_REQUEST = CLIENT_CERT_REQUEST_STR.getBytes(StandardCharsets.US_ASCII);
     public static final int NONCE_LENGTH = 64;
+    static final int FILE_BLOCK_SIZE = 245;
     public static final String CIPHER_SPEC = "RSA/ECB/PKCS1Padding";
-    public static final String CLIENT_AUTH_OK_STR = "OK!\n";
-    public static final byte[] CLIENT_AUTH_OK = CLIENT_AUTH_OK_STR.getBytes(StandardCharsets.US_ASCII);
+    public static final String CERT_TYPE = "X.509";
+    public static final String DIGEST_ALGORITHM = "SHA-256";
 
-    public static final String CLIENT_NUM_BLOCKS_STR = "BLOCKS=";
-    public static final byte[] CLIENT_NUM_BLOCKS = CLIENT_NUM_BLOCKS_STR.getBytes(StandardCharsets.US_ASCII);
+    public static final byte FILE_BLOB_NONTERMINAL = 0;
+    public static final byte FILE_BLOB_TERMINAL = 1;
 
-    public static final String CLIENT_FILE_NAME_STR = "FILE_NAME=";
-    public static final byte[] CLIENT_FILE_NAME = CLIENT_FILE_NAME_STR.getBytes(StandardCharsets.US_ASCII);
-    public static final String CLIENT_FILE_DIGEST_STR = "FILE_DIGEST=";
-    public static final byte[] CLIENT_FILE_DIGEST = CLIENT_FILE_DIGEST_STR.getBytes(StandardCharsets.US_ASCII);
+    public static final byte[] CLIENT_HELLO = "HELLO NONCE=".getBytes(StandardCharsets.US_ASCII);
+    public static final byte[] CERT_REQUEST = "CERT?\n".getBytes(StandardCharsets.US_ASCII);
+    public static final byte[] CLIENT_AUTH_OK = "OK!\n".getBytes(StandardCharsets.US_ASCII);
 
-    public static final String CLIENT_BYE_STR = "BYE!\n";
-    public static final byte[] CLIENT_BYE = CLIENT_BYE_STR.getBytes(StandardCharsets.US_ASCII);
+    public static final byte[] BYE = "BYE!\n".getBytes(StandardCharsets.US_ASCII);
 
-    /**
-     * Read blob from socket. The blob is prefixed with an unsigned short (16 bits) indicating the length of the
-     * data to follow. Beware of buffer under/overflow
-     *
-     * @param fromServer
-     * @return byte array containing the blob
-     * @throws IOException
-     */
-    public static byte[] readBlob(DataInputStream fromServer) throws IOException {
-        // First read 32 bits worth of unsigned data - that is the length
-        // Then allocate a buffer from it
-        int blobLength = fromServer.readInt();
-        assert blobLength > 0;
-        ByteBuffer buffer = ByteBuffer.allocate(blobLength);
-
-        // Now read all the data that will fit
-        for (int i = 0; i < blobLength; i++) {
-            buffer.put(fromServer.readByte());
+    public static byte[] readBlob(DataInputStream from) throws IOException {
+        // get length of blob
+        int blobLength = from.readInt();
+        if (blobLength < 0) {
+            blobLength = 0;
         }
-
-        return buffer.array();
+        return from.readNBytes(blobLength);
     }
 
     public static void writeBlob(DataOutputStream to, byte[] byteArray) throws IOException {
         to.writeInt(byteArray.length);
         to.write(byteArray);
-        to.flush();
     }
 
     public static void writeEncryptedBlob(
             DataOutputStream to,
+            Cipher cipher,
             byte[] byteArray,
             int offset,
-            int length,
-            Cipher cipher
+            int length
     ) throws IOException, GeneralSecurityException {
-        // byte[] len 2, offset 1, length 1 is valid
-        assert (offset + length) <= byteArray.length;
-
         writeBlob(to, cipher.doFinal(byteArray, offset, length));
     }
 
-    public static void writeEncryptedBlob(DataOutputStream to, byte[] byteArray, Cipher cipher)
+    public static void writeEncryptedBlob(DataOutputStream to, Cipher cipher, byte[] byteArray)
             throws IOException, GeneralSecurityException {
-        writeEncryptedBlob(to, byteArray, 0, byteArray.length, cipher);
+        writeEncryptedBlob(to, cipher, byteArray, 0, byteArray.length);
     }
 
-    public static byte[] readEncryptedBlob(DataInputStream from, Cipher decipher)
+    public static byte[] readEncryptedBlob(DataInputStream from, Cipher cipher)
             throws IOException, GeneralSecurityException {
         byte[] encryptedBlob = readBlob(from);
-        return decipher.doFinal(encryptedBlob);
+        return cipher.doFinal(encryptedBlob);
     }
 
-//    public static byte[] doCipherFInal(Cipher cipher, )
 }

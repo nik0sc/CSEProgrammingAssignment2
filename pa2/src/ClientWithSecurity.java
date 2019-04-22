@@ -2,6 +2,7 @@ import javax.crypto.Cipher;
 import java.io.*;
 import java.net.Socket;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.security.PublicKey;
@@ -13,164 +14,104 @@ import java.util.Arrays;
 public class ClientWithSecurity {
 	public static final String CA_CERT_FILENAME = "cacse.crt";
 
-	private static final int READ_FILE_BLOCK_SIZE = 245;
-
-	/**
-	 * Verify server certificate and return its public key
-	 *
-	 * @param serverCert
-	 * @return
-	 * @throws FileNotFoundException
-	 * @throws GeneralSecurityException
-	 */
-	public static PublicKey getAndVerifyPubKey(X509Certificate serverCert)
+    public static PublicKey verifyAndGetPublicKey(X509Certificate serverCert)
 			throws FileNotFoundException, GeneralSecurityException {
-		// Load CA pubkey
+		// load CA's public key
 		InputStream caCertInputStream = new FileInputStream(CA_CERT_FILENAME);
-		CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
+		CertificateFactory certificateFactory = CertificateFactory.getInstance(Protocol.CERT_TYPE);
 		X509Certificate caCert = (X509Certificate) certificateFactory.generateCertificate(caCertInputStream);
-		PublicKey caPubKey = caCert.getPublicKey();
-
-		// throws exceptions CertificateExpiredException, CertificateNotYetValidException
+		PublicKey caPublicKey = caCert.getPublicKey();
+		// check cert validity
 		caCert.checkValidity();
 		serverCert.checkValidity();
-
-		// Extract signature from cert
-		serverCert.verify(caPubKey);
-
+		// verify cert
+		serverCert.verify(caPublicKey);
+		// get public key from cert
 		return serverCert.getPublicKey();
 	}
 
-    /**
-	 * Perform the authentication handshake (get cert, verify with CA, challenge with nonce)
-	 *
-	 * @param toServer
-	 * @param fromServer
-	 * @param secureRandom
-	 * @return
-	 * @throws IOException
-	 * @throws GeneralSecurityException
-	 */
-	public static PublicKey doAuthenticationHandshake(DataOutputStream toServer, DataInputStream fromServer,
-													  SecureRandom secureRandom)
-			throws IOException, GeneralSecurityException {
-		// Generate nonce
+	public static PublicKey doAuthenticationHandshake(
+			DataOutputStream toServer,
+			DataInputStream fromServer
+	) throws IOException, GeneralSecurityException {
+		// generate nonce
 		byte[] nonce = new byte[Protocol.NONCE_LENGTH];
-		secureRandom.nextBytes(nonce);
+		new SecureRandom().nextBytes(nonce);
 
-        // Say hi to the remote server, send a nonce
-		// Length of CLIENT_HI string + nonce + newline
-		ByteBuffer outputHiBuffer = ByteBuffer.allocate(Protocol.CLIENT_HI.length + Protocol.NONCE_LENGTH + 1);
-		outputHiBuffer.put(Protocol.CLIENT_HI);
-		outputHiBuffer.put(nonce);
-		outputHiBuffer.put((byte)'\n');
-
-		toServer.write(outputHiBuffer.array());
+        // send client hello
+		ByteBuffer helloBuffer = ByteBuffer.allocate(Protocol.CLIENT_HELLO.length + Protocol.NONCE_LENGTH + 1);
+		helloBuffer.put(Protocol.CLIENT_HELLO);
+		helloBuffer.put(nonce);
+		helloBuffer.put("\n".getBytes(StandardCharsets.US_ASCII));
+		toServer.write(helloBuffer.array());
 		toServer.flush();
 
-		// Read the encrypted nonce and remember it
+		// get the encrypted nonce
 		byte[] encryptedNonce = Protocol.readBlob(fromServer);
 
-        // Ask for the cert
-		toServer.write(Protocol.CLIENT_CERT_REQUEST);
+        // request for cert
+		toServer.write(Protocol.CERT_REQUEST);
 		toServer.flush();
 
-        // Read and remember the cert
-		byte[] serverCertBytes = Protocol.readBlob(fromServer);
-
-		// Load and verify the server cert
-		CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
+        // get the cert
+		byte[] serverCertByteArray = Protocol.readBlob(fromServer);
+		CertificateFactory certificateFactory = CertificateFactory.getInstance(Protocol.CERT_TYPE);
 		X509Certificate serverCert = (X509Certificate) certificateFactory.generateCertificate(
-				new ByteArrayInputStream(serverCertBytes));
+				new ByteArrayInputStream(serverCertByteArray));
 
-		// Grab the public key
-		PublicKey serverPubKey = getAndVerifyPubKey(serverCert);
+		// verify cert and get the public key
+		PublicKey serverPubKey = verifyAndGetPublicKey(serverCert);
 
-		// And verify the nonce
+		// authenticate by checking the nonce
 		Cipher rsaCipherDec = Cipher.getInstance(Protocol.CIPHER_SPEC);
 		rsaCipherDec.init(Cipher.DECRYPT_MODE, serverPubKey);
 		byte[] nonceDec = rsaCipherDec.doFinal(encryptedNonce);
 
 		if (Arrays.equals(nonce, nonceDec)) {
-			// tell the server all is well
+			// send auth ok message to server
 			toServer.write(Protocol.CLIENT_AUTH_OK);
 			toServer.flush();
-
+			// and return
 			return serverPubKey;
 		} else {
-			// Die a horrible death
-			throw new GeneralSecurityException("OMG");
+			throw new GeneralSecurityException("something's not right :-(");
 		}
     }
-
 
     public static void doFileHandshake() {
 
 	}
 
-	/**
-	 * Send the file
-	 *
-	 * @param toServer
-	 * @param fromServer
-	 * @param cipherEnc
-	 * @param filename
-	 * @throws GeneralSecurityException
-	 * @throws IOException
-	 */
-	public static void sendFile(DataOutputStream toServer, DataInputStream fromServer,
-								Cipher cipherEnc, String filename)
-			throws GeneralSecurityException, IOException {
-		// make file digest
-		MessageDigest md = MessageDigest.getInstance("SHA-256");
-		long fileLength = new File(filename).length();
-		int numBlocks = (int) Math.ceil((double)fileLength/READ_FILE_BLOCK_SIZE);
-
-		// Send the encrypted filename and number of blocks
-		byte[] filenameBytes = filename.getBytes();
-
-		ByteBuffer filenameMessageBuf = ByteBuffer.allocate(
-				Protocol.CLIENT_FILE_NAME.length + filenameBytes.length);
-		filenameMessageBuf.put(Protocol.CLIENT_FILE_NAME);
-		filenameMessageBuf.put(filenameBytes);
-		Protocol.writeEncryptedBlob(toServer, filenameMessageBuf.array(), cipherEnc);
-
-		// Open the file
+	public static void sendFile(
+			DataOutputStream toServer,
+			Cipher cipherEnc,
+			String filename
+	) throws GeneralSecurityException, IOException {
+		// initialize
+		MessageDigest md = MessageDigest.getInstance(Protocol.DIGEST_ALGORITHM);
 		FileInputStream fileInputStream = new FileInputStream(filename);
 		BufferedInputStream bufferedFileInputStream = new BufferedInputStream(fileInputStream);
 
-		// File size?
+		// send encrypted file name
+		Protocol.writeEncryptedBlob(toServer, cipherEnc, filename.getBytes(StandardCharsets.US_ASCII));
+		toServer.flush();
 
-		System.out.println(String.format("Sending %d blocks of %d ciphertext bytes each",
-				numBlocks, cipherEnc.getBlockSize()));
-
-
-
-		byte[] fromFileBuffer = new byte[READ_FILE_BLOCK_SIZE];
-		int i = 0;
-		// Send the file
-		while (true) {
-			int numBytes = bufferedFileInputStream.read(fromFileBuffer);
-
-			if (numBytes == -1) {
-				break;
-			}
-
-			Protocol.writeEncryptedBlob(toServer, fromFileBuffer, 0, numBytes, cipherEnc);
-			md.update(fromFileBuffer, 0, numBytes);
-			i++;
+		// read, update digest, and send file block by block
+		byte[] fromFileBuffer = new byte[Protocol.FILE_BLOCK_SIZE];		// first byte indicates whether this is the last block
+		boolean isLastBlock = false;
+		while(!isLastBlock) {
+			int numBytes = bufferedFileInputStream.readNBytes(fromFileBuffer, 1, Protocol.FILE_BLOCK_SIZE - 1);
+			isLastBlock = (numBytes < Protocol.FILE_BLOCK_SIZE - 1);
+			fromFileBuffer[0] = isLastBlock? Protocol.FILE_BLOB_TERMINAL : Protocol.FILE_BLOB_NONTERMINAL;
+			Protocol.writeEncryptedBlob(toServer, cipherEnc, fromFileBuffer, 0, numBytes + 1);
+			md.update(fromFileBuffer, 1, numBytes);
 		}
+		// only need to flush after all writes are done
+        toServer.flush();
 
-		System.out.println(String.format("Sent %d blocks", i));
-
-		// Send digest
-		byte[] digest = md.digest();
-		ByteBuffer digestMessageBuf = ByteBuffer.allocate(
-				Protocol.CLIENT_FILE_DIGEST.length + digest.length);
-		digestMessageBuf.put(Protocol.CLIENT_FILE_DIGEST);
-		digestMessageBuf.put(digest);
-
-		Protocol.writeEncryptedBlob(toServer, digestMessageBuf.array(), cipherEnc);
+		// send digest
+		Protocol.writeEncryptedBlob(toServer, cipherEnc, md.digest());
+		toServer.flush();
 
 		bufferedFileInputStream.close();
 		fileInputStream.close();
@@ -196,8 +137,7 @@ public class ClientWithSecurity {
 
 		long timeStarted = System.nanoTime();
 
-		SecureRandom secureRandom = new SecureRandom();
-		PublicKey serverPubKey;
+		PublicKey serverPublicKey;
 
 		try {
 
@@ -208,19 +148,22 @@ public class ClientWithSecurity {
 			toServer = new DataOutputStream(clientSocket.getOutputStream());
 			fromServer = new DataInputStream(clientSocket.getInputStream());
 
-			// Do the authentication!
-			serverPubKey = doAuthenticationHandshake(toServer, fromServer, secureRandom);
+			// do authentication and get public key
+			serverPublicKey = doAuthenticationHandshake(toServer, fromServer);
 
 			System.out.println("Sending file...");
 
-			// set up cipher
+			// initialize cipher
             Cipher rsaCipherEnc = Cipher.getInstance(Protocol.CIPHER_SPEC);
-            rsaCipherEnc.init(Cipher.ENCRYPT_MODE, serverPubKey);
+            rsaCipherEnc.init(Cipher.ENCRYPT_MODE, serverPublicKey);
 
-            sendFile(toServer, fromServer, rsaCipherEnc, filename);
+            // send file
+            sendFile(toServer, rsaCipherEnc, filename);
 
+			// finalize
 			System.out.println("Closing connection...");
-			toServer.write(rsaCipherEnc.doFinal(Protocol.CLIENT_BYE));
+			toServer.write(rsaCipherEnc.doFinal(Protocol.BYE));
+			toServer.flush();
 			toServer.close();
 			fromServer.close();
 
