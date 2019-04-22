@@ -8,7 +8,7 @@ import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.Arrays;
 
-public class ServerWithoutSecurity {
+public class ServerCP1 {
 
 	private static final String PRIVATE_KEY_FILE_NAME = "private_key.der";
 	private static PrivateKey privateKey = null;
@@ -46,12 +46,10 @@ public class ServerWithoutSecurity {
         while(!isLastBlock) {
             byte[] readBuffer = Protocol.readEncryptedBlob(fromClient, cipher);
             isLastBlock = (readBuffer[0] == Protocol.FILE_BLOB_TERMINAL);
-            System.out.print(new String(Arrays.copyOfRange(readBuffer, 1, readBuffer.length - 1), StandardCharsets.US_ASCII));
             bufferedFileOutputStream.write(readBuffer, 1, readBuffer.length - 1);
             md.update(readBuffer, 1, readBuffer.length - 1);
         }
-        // flush and close file
-        bufferedFileOutputStream.flush();
+        // close file
         bufferedFileOutputStream.close();
         fileOutputStream.close();
         // make sure digests match, if not then delete file
@@ -96,9 +94,6 @@ public class ServerWithoutSecurity {
 		DataOutputStream toClient = null;
 		DataInputStream fromClient = null;
 
-		FileOutputStream fileOutputStream = null;
-		BufferedOutputStream bufferedFileOutputStream = null;
-
 		try {
 		    loadPrivateKey();
 
@@ -117,6 +112,10 @@ public class ServerWithoutSecurity {
 
 			receiveFile(fromClient, rsaCipherDec);
 
+			toClient.close();
+			fromClient.close();
+			connectionSocket.close();
+			welcomeSocket.close();
 		} catch (Exception e) {e.printStackTrace();}
 
 	}

@@ -20,7 +20,10 @@ public class Protocol {
     public static final byte[] CERT_REQUEST = "CERT?\n".getBytes(StandardCharsets.US_ASCII);
     public static final byte[] CLIENT_AUTH_OK = "OK!\n".getBytes(StandardCharsets.US_ASCII);
 
-    public static final byte[] BYE = "BYE!\n".getBytes(StandardCharsets.US_ASCII);
+    public static final String SYMMETRIC_CIPHER_TYPE = "AES";
+    public static final String SYMMETRIC_CIPHER_SPEC = "AES/ECB/PKCS5Padding";
+
+    public static final byte[] AGREE_KEY = "AGREE KEY".getBytes(StandardCharsets.US_ASCII);
 
     public static byte[] readBlob(DataInputStream from) throws IOException {
         // get length of blob

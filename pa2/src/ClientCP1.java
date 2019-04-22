@@ -11,7 +11,7 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.Arrays;
 
-public class ClientWithSecurity {
+public class ClientCP1 {
 	public static final String CA_CERT_FILENAME = "cacse.crt";
 
     public static PublicKey verifyAndGetPublicKey(X509Certificate serverCert)
@@ -78,10 +78,6 @@ public class ClientWithSecurity {
 		}
     }
 
-    public static void doFileHandshake() {
-
-	}
-
 	public static void sendFile(
 			DataOutputStream toServer,
 			Cipher cipherEnc,
@@ -128,8 +124,6 @@ public class ClientWithSecurity {
     	int port = 4321;
     	if (args.length > 2) port = Integer.parseInt(args[2]);
 
-		int numBytes = 0;
-
 		Socket clientSocket = null;
 
         DataOutputStream toServer = null;
@@ -162,8 +156,6 @@ public class ClientWithSecurity {
 
 			// finalize
 			System.out.println("Closing connection...");
-			toServer.write(rsaCipherEnc.doFinal(Protocol.BYE));
-			toServer.flush();
 			toServer.close();
 			fromServer.close();
 
