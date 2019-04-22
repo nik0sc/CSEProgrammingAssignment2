@@ -193,7 +193,7 @@ public class ClientWithSecurityCP1 {
 
 	public static void main(String[] args) {
 
-    	String filename = "rr.txt";
+    	String filename = "interject.txt";
     	if (args.length > 0) filename = args[0];
 
     	String serverAddress = "localhost";
