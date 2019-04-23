@@ -175,8 +175,6 @@ public class ClientCommon {
         metadataBuf.put(filenameBytes);
         metadataBuf.put((byte)'\0');
 
-        System.out.println("Metadata: " + Arrays.toString(metadataBuf.array()));
-
 		Protocol.writeEncryptedBlob(toServer, metadataBuf.array(), cipherEnc);
 
 		Protocol.readOK(fromServer);

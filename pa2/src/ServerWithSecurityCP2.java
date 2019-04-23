@@ -21,32 +21,46 @@ public class ServerWithSecurityCP2 {
 		DataOutputStream toClient = null;
 		DataInputStream fromClient = null;
 
+        try {
+            welcomeSocket = new ServerSocket(port);
+        } catch (IOException e) {
+            System.out.println("Can't bind port " + port);
+            return;
+        }
+
 		try {
-			welcomeSocket = new ServerSocket(port);
-			connectionSocket = welcomeSocket.accept();
-			fromClient = new DataInputStream(connectionSocket.getInputStream());
-			toClient = new DataOutputStream(connectionSocket.getOutputStream());
+			System.out.println("Server CP2 listening on port " + port);
 
-			PrivateKey privateKey = ServerCommon.getPrivateKey();
-			Cipher rsaCipherEnc = Cipher.getInstance(Protocol.CIPHER_1_SPEC);
-			rsaCipherEnc.init(Cipher.ENCRYPT_MODE, privateKey);
-			Cipher rsaCipherDec = Cipher.getInstance(Protocol.CIPHER_1_SPEC);
-			rsaCipherDec.init(Cipher.DECRYPT_MODE, privateKey);
+			while (true) {
+				connectionSocket = welcomeSocket.accept();
+				fromClient = new DataInputStream(connectionSocket.getInputStream());
+				toClient = new DataOutputStream(connectionSocket.getOutputStream());
 
-			ServerCommon.doAuthenticationHandshake(toClient, fromClient, rsaCipherEnc, Protocol.CLIENT_HI_CP2);
+				PrivateKey privateKey = ServerCommon.getPrivateKey();
+				Cipher rsaCipherEnc = Cipher.getInstance(Protocol.CIPHER_1_SPEC);
+				rsaCipherEnc.init(Cipher.ENCRYPT_MODE, privateKey);
+				Cipher rsaCipherDec = Cipher.getInstance(Protocol.CIPHER_1_SPEC);
+				rsaCipherDec.init(Cipher.DECRYPT_MODE, privateKey);
 
-			Protocol.SessionCipher sessionCipher = ServerCommon.doKeyExchange(toClient, fromClient, rsaCipherDec);
+				ServerCommon.doAuthenticationHandshake(toClient, fromClient, rsaCipherEnc, Protocol.CLIENT_HI_CP2);
 
-			ServerCommon.receiveFile(toClient, fromClient, sessionCipher.getDec());
+				Protocol.SessionCipher sessionCipher = ServerCommon.doKeyExchange(toClient, fromClient, rsaCipherDec);
 
-			toClient.close();
-			fromClient.close();
-			connectionSocket.close();
-			welcomeSocket.close();
+				ServerCommon.receiveFile(toClient, fromClient, sessionCipher.getDec());
+
+				toClient.close();
+				fromClient.close();
+				connectionSocket.close();
+			}
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 
+        try {
+            welcomeSocket.close();
+        } catch (IOException e) {
+            System.out.println("Can't unbind port " + port);
+        }
 	}
 
 }

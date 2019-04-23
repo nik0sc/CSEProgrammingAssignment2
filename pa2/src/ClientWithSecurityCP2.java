@@ -18,7 +18,7 @@ public class ClientWithSecurityCP2 {
     	if (args.length > 0) filename = args[0];
 
     	String serverAddress = "localhost";
-    	if (args.length > 1) filename = args[1];
+    	if (args.length > 1) serverAddress = args[1];
 
     	int port = 4321;
     	if (args.length > 2) port = Integer.parseInt(args[2]);

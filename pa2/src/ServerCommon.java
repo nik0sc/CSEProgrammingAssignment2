@@ -166,5 +166,8 @@ public class ServerCommon {
 		// Flush and close
 		fileOutputStream.flush();
 		fileOutputStream.close();
+
+		System.out.println(String.format("Wrote %d bytes in %d blocks to file \"%s\"",
+                bytesWritten, numBlocks, filename));
 	}
 }

@@ -18,28 +18,42 @@ public class ServerWithSecurityCP1 {
 
 		try {
 			welcomeSocket = new ServerSocket(port);
-			connectionSocket = welcomeSocket.accept();
-			fromClient = new DataInputStream(connectionSocket.getInputStream());
-			toClient = new DataOutputStream(connectionSocket.getOutputStream());
+		} catch (IOException e) {
+			System.out.println("Can't bind port " + port);
+			return;
+		}
 
-			PrivateKey privateKey = ServerCommon.getPrivateKey();
-			Cipher rsaCipherEnc = Cipher.getInstance(Protocol.CIPHER_1_SPEC);
-			rsaCipherEnc.init(Cipher.ENCRYPT_MODE, privateKey);
-			Cipher rsaCipherDec = Cipher.getInstance(Protocol.CIPHER_1_SPEC);
-			rsaCipherDec.init(Cipher.DECRYPT_MODE, privateKey);
+		try {
 
-			ServerCommon.doAuthenticationHandshake(toClient, fromClient, rsaCipherEnc, Protocol.CLIENT_HI_CP1);
+			System.out.println("Server CP1 listening on port " + port);
 
-			ServerCommon.receiveFile(toClient, fromClient, rsaCipherDec);
+			while (true) {
+				connectionSocket = welcomeSocket.accept();
+				fromClient = new DataInputStream(connectionSocket.getInputStream());
+				toClient = new DataOutputStream(connectionSocket.getOutputStream());
 
-			toClient.close();
-			fromClient.close();
-			connectionSocket.close();
-			welcomeSocket.close();
+				PrivateKey privateKey = ServerCommon.getPrivateKey();
+				Cipher rsaCipherEnc = Cipher.getInstance(Protocol.CIPHER_1_SPEC);
+				rsaCipherEnc.init(Cipher.ENCRYPT_MODE, privateKey);
+				Cipher rsaCipherDec = Cipher.getInstance(Protocol.CIPHER_1_SPEC);
+				rsaCipherDec.init(Cipher.DECRYPT_MODE, privateKey);
+
+				ServerCommon.doAuthenticationHandshake(toClient, fromClient, rsaCipherEnc, Protocol.CLIENT_HI_CP1);
+
+				ServerCommon.receiveFile(toClient, fromClient, rsaCipherDec);
+
+				toClient.close();
+				fromClient.close();
+				connectionSocket.close();
+			}
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 
+		try {
+			welcomeSocket.close();
+		} catch (IOException e) {
+			System.out.println("Can't unbind port " + port);
+		}
 	}
-
 }
