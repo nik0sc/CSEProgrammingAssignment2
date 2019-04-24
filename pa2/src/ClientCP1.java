@@ -89,7 +89,8 @@ public class ClientCP1 {
 		BufferedInputStream bufferedFileInputStream = new BufferedInputStream(fileInputStream);
 
 		// send encrypted file name
-		Protocol.writeEncryptedBlob(toServer, cipherEnc, filename.getBytes(StandardCharsets.US_ASCII));
+		String baseFilename = new File(filename).getName();
+		Protocol.writeEncryptedBlob(toServer, cipherEnc, baseFilename.getBytes(StandardCharsets.US_ASCII));
 		toServer.flush();
 
 		// read, update digest, and send file block by block
@@ -115,7 +116,7 @@ public class ClientCP1 {
 
 	public static void main(String[] args) {
 
-    	String filename = "HeartbleedBlack.png";
+    	String filename = "pa2/test_files/sceneries.jpg";
     	if (args.length > 0) filename = args[0];
 
     	String serverAddress = "10.12.32.42";

@@ -110,8 +110,9 @@ public class ClientCP2 {
         BufferedInputStream bufferedFileInputStream = new BufferedInputStream(fileInputStream);
 
         // send 16 blocks of encrypted file name
+        String baseFilename = new File(filename).getName();
         byte[] filenameByteArray = new byte[16 * blockSize - 1];
-        System.arraycopy(filename.getBytes(StandardCharsets.US_ASCII), 0, filenameByteArray, 0, filename.length());
+        System.arraycopy(baseFilename.getBytes(StandardCharsets.US_ASCII), 0, filenameByteArray, 0, baseFilename.length());
         if (cipherEnc.getOutputSize(filenameByteArray.length) > 16 * blockSize) {
             throw new IllegalArgumentException("file name longer than 16 cipher blocks");
         }
@@ -141,7 +142,7 @@ public class ClientCP2 {
 
     public static void main(String[] args) {
 
-        String filename = "HeartbleedBlack.png";
+        String filename = "pa2/test_files/campus.jpg";
         if (args.length > 0) filename = args[0];
 
         String serverAddress = "10.12.32.42";
