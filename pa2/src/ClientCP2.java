@@ -110,9 +110,9 @@ public class ClientCP2 {
         BufferedInputStream bufferedFileInputStream = new BufferedInputStream(fileInputStream);
 
         // send 16 blocks of encrypted file name
-        byte[] filenameByteArray = new byte[16 * blockSize];
+        byte[] filenameByteArray = new byte[16 * blockSize - 1];
         System.arraycopy(filename.getBytes(StandardCharsets.US_ASCII), 0, filenameByteArray, 0, filename.length());
-        if (cipherEnc.getOutputSize(filename.length()) > 16 * blockSize) {
+        if (cipherEnc.getOutputSize(filename.length()) > 16 * blockSize - 1) {
             throw new IllegalArgumentException("file name longer than 16 cipher blocks");
         }
         toServer.write(cipherEnc.doFinal(filename.getBytes(StandardCharsets.US_ASCII)));
