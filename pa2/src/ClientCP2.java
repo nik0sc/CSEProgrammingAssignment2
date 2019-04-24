@@ -109,8 +109,10 @@ public class ClientCP2 {
         FileInputStream fileInputStream = new FileInputStream(filename);
         BufferedInputStream bufferedFileInputStream = new BufferedInputStream(fileInputStream);
 
-        // send encrypted file name
-        if (cipherEnc.getOutputSize(filename.length()) > blockSize) {
+        // send 16 blocks of encrypted file name
+        byte[] filenameByteArray = new byte[16 * blockSize];
+        System.arraycopy(filename.getBytes(StandardCharsets.US_ASCII), 0, filenameByteArray, 0, filename.length());
+        if (cipherEnc.getOutputSize(filename.length()) > 16 * blockSize) {
             throw new IllegalArgumentException("file name longer than cipher block size");
         }
         toServer.write(cipherEnc.doFinal(filename.getBytes(StandardCharsets.US_ASCII)));
@@ -139,10 +141,10 @@ public class ClientCP2 {
 
     public static void main(String[] args) {
 
-        String filename = "rr.txt";
+        String filename = "HeartbleedBlack.png";
         if (args.length > 0) filename = args[0];
 
-        String serverAddress = "localhost";
+        String serverAddress = "10.12.32.42";
         if (args.length > 1) filename = args[1];
 
         int port = 4321;

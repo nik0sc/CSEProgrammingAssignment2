@@ -38,8 +38,8 @@ public class ServerCP2 {
     private static void receiveFile(DataInputStream fromClient, Cipher cipher)
             throws IOException, GeneralSecurityException {
         int blockSize = cipher.getBlockSize();
-        // read file name
-        byte[] filenameByteArray = cipher.doFinal(fromClient.readNBytes(blockSize));
+        // read 16 blocks of file name
+        byte[] filenameByteArray = cipher.doFinal(fromClient.readNBytes(16 * blockSize));
         String filename = "recv_" + new String(filenameByteArray, StandardCharsets.US_ASCII);
         // create file
         FileOutputStream fileOutputStream = new FileOutputStream(filename);
