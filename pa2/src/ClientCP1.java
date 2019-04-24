@@ -115,7 +115,7 @@ public class ClientCP1 {
 
 	public static void main(String[] args) {
 
-    	String filename = "HeartbleedBlack.txt";
+    	String filename = "HeartbleedBlack.png";
     	if (args.length > 0) filename = args[0];
 
     	String serverAddress = "10.12.32.42";

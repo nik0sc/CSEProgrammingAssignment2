@@ -144,7 +144,7 @@ public class ClientCP2 {
         String filename = "HeartbleedBlack.png";
         if (args.length > 0) filename = args[0];
 
-        String serverAddress = "localhost";
+        String serverAddress = "10.12.32.42";
         if (args.length > 1) filename = args[1];
 
         int port = 4321;
