@@ -113,7 +113,7 @@ public class ClientCP2 {
         byte[] filenameByteArray = new byte[16 * blockSize];
         System.arraycopy(filename.getBytes(StandardCharsets.US_ASCII), 0, filenameByteArray, 0, filename.length());
         if (cipherEnc.getOutputSize(filename.length()) > 16 * blockSize) {
-            throw new IllegalArgumentException("file name longer than cipher block size");
+            throw new IllegalArgumentException("file name longer than 16 cipher blocks");
         }
         toServer.write(cipherEnc.doFinal(filename.getBytes(StandardCharsets.US_ASCII)));
         toServer.flush();

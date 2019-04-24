@@ -40,7 +40,7 @@ public class ServerCP2 {
         int blockSize = cipher.getBlockSize();
         // read 16 blocks of file name
         byte[] filenameByteArray = cipher.doFinal(fromClient.readNBytes(16 * blockSize));
-        String filename = "recv_" + new String(filenameByteArray, StandardCharsets.US_ASCII);
+        String filename = "recv_" + new String(filenameByteArray, StandardCharsets.US_ASCII).replaceAll("\0", "");
         // create file
         FileOutputStream fileOutputStream = new FileOutputStream(filename);
         BufferedOutputStream bufferedFileOutputStream = new BufferedOutputStream(fileOutputStream);
